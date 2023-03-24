@@ -26,6 +26,12 @@
       scale = 1;
       preScale = 1;
 
+      ov = new Float32Array([
+        1, 0, 0,
+        0, 1, 0,
+        0, 0, 1,
+      ]);
+
       constructor(id, options = {
         width: 600,
         height: 400
@@ -48,28 +54,37 @@
       onMousewheel(e) {
         e.preventDefault();
 
+        const { clientX, clientY, deltaY } = e;
+        const currSacle = 1 + (deltaY < 0 ? 0.1 : -0.1);
+        const zoom = Math.max(currSacle > 0 ? currSacle : 1, 0.1);
 
-        if (e.wheelDelta > 0) {
-          // 放大
-          this.scale = parseFloat((this.scaleStep + this.scale).toFixed(2)); // 解决小数点运算丢失精度的问题
-          if (this.scale > this.maxScale) {
-            this.scale = this.maxScale;
-            return;
-          }
-        } else {
-          // 缩小
-          this.scale = parseFloat((this.scale - this.scaleStep).toFixed(2)); // 解决小数点运算丢失精度的问题
-          if (this.scale < this.minScale) {
-            this.scale = this.minScale;
-            return;
-          }
-        }
+        console.log('zoom:', zoom);
 
-        this.zoom();
-      }
+        const x = clientX * (1 - zoom);
+        const y = clientY * (1 - zoom);
+        const t = new Float32Array([
+          zoom, 0, 0,
+          0, zoom, 0,
+          x, y, 1,
+        ]);
+        this.ov = this.refresh(this.ov, t);
+        // if (e.wheelDelta > 0) {
+        //   // 放大
+        //   this.scale = parseFloat((this.scaleStep + this.scale).toFixed(2)); // 解决小数点运算丢失精度的问题
+        //   if (this.scale > this.maxScale) {
+        //     this.scale = this.maxScale;
+        //     return;
+        //   }
+        // } else {
+        //   // 缩小
+        //   this.scale = parseFloat((this.scale - this.scaleStep).toFixed(2)); // 解决小数点运算丢失精度的问题
+        //   if (this.scale < this.minScale) {
+        //     this.scale = this.minScale;
+        //     return;
+        //   }
+        // }
 
-      zoom() {
-        this.paint(this.ctx);
+        // this.zoom();
       }
 
       onMousedown(e) {
@@ -81,55 +96,39 @@
       }
 
       onMousemove(e) {
-       this.offset.x = this.curOffset.x + (e.x - this.x);
-       this.offset.y = this.curOffset.y + (e.y - this.y);
-
-       this.paint();
+        const {movementX, movementY} = e;
+        const t = new Float32Array([
+            1, 0, 0,
+            0, 1, 0,
+            movementX, movementY, 1,
+        ]);
+        this.ov = this.refresh(this.ov, t);
       }
 
       onMouseup() {
-        this.curOffset.x = this.offset.x;
-        this.curOffset.y = this.offset.y;
         window.removeEventListener('mousemove', this.onMousemove);
         window.removeEventListener('mouseup', this.onMouseup);
       }
 
-      draw() {
-        this.ctx.fillStyle = 'red';
-        this.ctx.fillRect(50, 50, 50, 50);
-
+      refresh(o, t) {
         const out = new Float32Array([
           0, 0, 0,
           0, 0, 0,
           0, 0, 0,
         ]);
-
-        const t = new Float32Array([
-          1, 0, 0,
-          0, 1, 0,
-          6, 6, 1,
-        ]);
-
-        const o = new Float32Array([
-          4, 4, 
-        ])
         const nv = glMatrix.mat3.multiply(out, t, o);
-
-        console.log('nv', nv)
-
-        this.ctx.fillStyle = 'green';
-        this.ctx.fillRect(150, 150, 50, 50);
-      }
-
-      clear() {
+        // this.ctx.save();
+        this.ctx.clearRect(0, 0, this.width, this.height);
         this.canvas.width = this.width;
+        this.ctx.transform(nv[0], nv[3], nv[1], nv[4], nv[6], nv[7]);
+        this.draw();
+        // this.ctx.restore();
+        return nv;
       }
 
-      paint() {
-        this.clear();
-        this.ctx.translate(this.offset.x, this.offset.y);
-        this.ctx.scale(this.scale, this.scale);
-        this.draw();
+      draw() {
+        this.ctx.fillStyle = 'red';
+        this.ctx.fillRect(0, 0, 50, 50);
       }
     }
 
