@@ -9,8 +9,8 @@
   <style>
     canvas {
       border: solid 1px #000;
-      margin: 0px auto;
       display: block;
+      cursor: move;
     }
   </style>
 </head>
@@ -26,7 +26,7 @@
       scale = 1;
       preScale = 1;
 
-      ov = new Float32Array([
+      matrix = new Float32Array([
         1, 0, 0,
         0, 1, 0,
         0, 0, 1,
@@ -53,12 +53,17 @@
 
       onMousewheel(e) {
         e.preventDefault();
-
         const { clientX, clientY, deltaY } = e;
-        const currSacle = 1 + (deltaY < 0 ? 0.1 : -0.1);
-        const zoom = Math.max(currSacle > 0 ? currSacle : 1, 0.1);
+        const zoom = 1 + (deltaY < 0 ? this.scaleStep : -this.scaleStep);
+        this.scale = parseFloat((this.scale * zoom).toFixed(2));
 
-        console.log('zoom:', zoom);
+        if (this.scale < this.minScale) {
+          this.scale = this.minScale;
+          return;
+        } else if(this.scale > this.maxScale) {
+          this.scale = this.maxScale;
+          return;
+        }
 
         const x = clientX * (1 - zoom);
         const y = clientY * (1 - zoom);
@@ -67,24 +72,7 @@
           0, zoom, 0,
           x, y, 1,
         ]);
-        this.ov = this.refresh(this.ov, t);
-        // if (e.wheelDelta > 0) {
-        //   // 放大
-        //   this.scale = parseFloat((this.scaleStep + this.scale).toFixed(2)); // 解决小数点运算丢失精度的问题
-        //   if (this.scale > this.maxScale) {
-        //     this.scale = this.maxScale;
-        //     return;
-        //   }
-        // } else {
-        //   // 缩小
-        //   this.scale = parseFloat((this.scale - this.scaleStep).toFixed(2)); // 解决小数点运算丢失精度的问题
-        //   if (this.scale < this.minScale) {
-        //     this.scale = this.minScale;
-        //     return;
-        //   }
-        // }
-
-        // this.zoom();
+        this.matrix = this.refresh(this.matrix, t);
       }
 
       onMousedown(e) {
@@ -102,7 +90,7 @@
             0, 1, 0,
             movementX, movementY, 1,
         ]);
-        this.ov = this.refresh(this.ov, t);
+        this.matrix = this.refresh(this.matrix, t);
       }
 
       onMouseup() {
@@ -116,14 +104,14 @@
           0, 0, 0,
           0, 0, 0,
         ]);
-        const nv = glMatrix.mat3.multiply(out, t, o);
-        // this.ctx.save();
+        const calc = glMatrix.mat3.multiply(out, t, o);
+
+        this.ctx.save();
         this.ctx.clearRect(0, 0, this.width, this.height);
-        this.canvas.width = this.width;
-        this.ctx.transform(nv[0], nv[3], nv[1], nv[4], nv[6], nv[7]);
+        this.ctx.transform(calc[0], calc[3], calc[1], calc[4], calc[6], calc[7]);
         this.draw();
-        // this.ctx.restore();
-        return nv;
+        this.ctx.restore();
+        return calc;
       }
 
       draw() {
