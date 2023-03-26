@@ -265,5 +265,77 @@ $$
 
 ## 代码实现
 
+### 实现拖拽
+
+`e.movementX` 和 `e.movementY` 记录了鼠标水平方向和垂直方向两次移动之间的距离。`t` 是变换矩阵，注意这里的矩阵 `t` 用 `Float32Array` 类型表示，并且输入到 `glMatrix` 中参与计算时需要变为 `t` 的转置（前文已经介绍，`glMatrix` 是以列为主的格式）。
+```javascript
+onMousemove(e) {
+  const { movementX, movementY } = e;
+  const t = new Float32Array([
+    1, 0, 0,
+    0, 1, 0,
+    movementX, movementY, 1,
+  ]);
+  this.matrix = this.refresh(this.matrix, t);
+}
+```
+
+每次移动之后，调用 `refresh` 方法，利用 `glMatrix.mat3.multiply` 方法重新计算移动之后的矩阵值，通过 `ctx.transform` 方法来更新视图。
+
+```javascript
+refresh(o, t) {
+  const out = new Float32Array([
+    0, 0, 0,
+    0, 0, 0,
+    0, 0, 0,
+  ]);
+  const calc = glMatrix.mat3.multiply(out, t, o);
+  this.ctx.save();
+  this.ctx.clearRect(0, 0, this.width, this.height);
+  this.ctx.transform(calc[0], calc[3], calc[1], calc[4], calc[6], calc[7]);
+  this.draw();
+  this.ctx.restore();
+  return calc;
+}
+```
+
+### 实现以鼠标当前位置为原点缩放
+
+鼠标滚轮事件触发时，通过 event.deltaY 值来判断是放大还是缩小，放大超过最大值或者缩小低于最小值时则停止缩放。
+
+以鼠标当前位置为原点缩放的关键是在缩放的同时需要考虑偏移量，水平方向的偏移量为 `clientX * (1 - zoom)`，垂直方向的偏移量为 `clientY * (1 - zoom)`。
+
+```javascript
+onMousewheel(e) {
+  e.preventDefault();
+  const { clientX, clientY, deltaY } = e;
+  const zoom = 1 + (deltaY < 0 ? this.scaleStep : -this.scaleStep);
+  this.scale = parseFloat((this.scale * zoom).toFixed(2));
+
+  if (this.scale < this.minScale) {
+    this.scale = this.minScale;
+    return;
+  } else if(this.scale > this.maxScale) {
+    this.scale = this.maxScale;
+    return;
+  }
+
+  const x = clientX * (1 - zoom);
+  const y = clientY * (1 - zoom);
+  const t = new Float32Array([
+    zoom, 0, 0,
+    0, zoom, 0,
+    x, y, 1,
+  ]);
+  this.matrix = this.refresh(this.matrix, t);
+}
+```
+
+## 总结
+
+通过矩阵的方式用 `Canvas` 实现以鼠标当前位置为原点缩放及画布拖动，理解起来更加容易（当然前提是要有一定的数学基础，起码了解过矩阵🤣），大大减少了代码量，同时缩放和拖拽的逻辑可以复用，不仅是在Canvas中，普通的div拖拽和放大也是一样的代码逻辑。
+
+更多精彩文章欢迎大家关注我的vx公众号：**前端架构师笔记**。本文完整代码地址：https://github.com/astonishqft/canvas-matrix
+
 
 
